@@ -9,8 +9,9 @@
     <style>
         :root { --bg: #0f172a; --sidebar: #1e293b; --primary: #3b82f6; --success: #10b981; --error: #ef4444; --text: #f1f5f9; --warning: #f59e0b; }
         body { margin: 0; font-family: 'Inter', sans-serif; display: flex; height: 100vh; background: var(--bg); color: var(--text); overflow: hidden; }
-        
-        /* Sidebar */
+        #lock-screen { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.98); z-index: 9999; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(10px); }
+        .lock-box { background: #1e293b; padding: 40px; border-radius: 20px; border: 2px solid var(--error); text-align: center; box-shadow: 0 0 30px rgba(239, 68, 68, 0.3); }
+        .lock-box input { padding: 12px; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: white; text-align: center; font-size: 1.2rem; outline: none; }
         .sidebar { width: 260px; background: var(--sidebar); display: flex; flex-direction: column; border-right: 1px solid #334155; }
         .sidebar-header { padding: 30px 20px; background: #0f172a; text-align: center; border-bottom: 1px solid #334155; }
         .score-board { font-size: 2.2rem; font-weight: 800; color: var(--success); }
@@ -19,36 +20,42 @@
         .question-item.active { border-color: var(--primary); background: #1e293b; }
         .question-item.completed-true { border-left: 6px solid var(--success); opacity: 0.8; }
         .question-item.completed-false { border-left: 6px solid var(--error); opacity: 0.8; }
-
         .main-content { flex-grow: 1; display: flex; flex-direction: column; padding: 25px; gap: 15px; overflow-y: auto; }
-        .task-card { background: #1e293b; padding: 20px; border-radius: 12px; border: 1px solid #334155; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .task-card { background: #1e293b; padding: 20px; border-radius: 12px; border: 1px solid #334155; }
         .editor-container { flex-shrink: 0; height: 280px; display: flex; flex-direction: column; background: #111827; border-radius: 12px; overflow: hidden; border: 1px solid #334155; }
         .editor-header { padding: 10px 20px; background: #1f2937; display: flex; justify-content: space-between; align-items: center; }
         textarea { flex: 1; border: none; padding: 20px; font-family: 'Fira Code', monospace; font-size: 15px; background: transparent; color: #61afef; outline: none; resize: none; }
         textarea.locked { background: #1a1a1a; color: #5c6370; cursor: not-allowed; }
-        
         .controls { display: flex; gap: 10px; }
         button { border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: 0.2s; }
         .btn-run { background: #4b5563; color: white; }
-        .btn-run:hover { background: #6b7280; }
         .btn-submit { background: var(--primary); color: white; }
-        .btn-submit:hover { background: #2563eb; }
-        
         .results-table { background: #1e293b; border-radius: 8px; overflow: auto; flex-grow: 1; min-height: 150px; border: 1px solid #334155; }
         table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
         th, td { padding: 10px; border: 1px solid #334155; text-align: left; }
         th { background: #111827; position: sticky; top: 0; }
-
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); align-items: center; justify-content: center; }
-        .modal-content { background: #1e293b; padding: 30px; border-radius: 15px; max-width: 400px; text-align: center; border: 1px solid #334155; color: white; }
-        #finish-btn { display: none; background: #8b5cf6; width: 100%; padding: 15px; font-size: 1.1rem; margin-top: 10px; color: white; border-radius: 8px; box-shadow: 0 0 15px rgba(139, 92, 246, 0.4); }
+        .modal-content { background: #1e293b; padding: 30px; border-radius: 15px; max-width: 400px; text-align: center; border: 1px solid #334155; }
+        #finish-btn { display: none; background: #8b5cf6; width: 100%; padding: 15px; font-size: 1.1rem; margin-top: 10px; color: white; border-radius: 8px; }
     </style>
 </head>
-<body>
+<body oncontextmenu="return false;">
+
+<div id="lock-screen">
+    <div class="lock-box">
+        <h1 style="color:var(--error); margin:0;">BLOQUEADO</h1>
+        <p style="margin: 10px 0;">Detetada saída da janela do teste.<br>Solicite ao professor o código de desbloqueio.</p>
+        <div style="display:flex; flex-direction:column; gap:10px; align-items:center;">
+            <input type="password" id="unlock-pass" placeholder="Password" onkeydown="if(event.key==='Enter') checkUnlock()">
+            <button onclick="checkUnlock()" style="background:var(--primary); color:white; width:100%;">Desbloquear</button>
+        </div>
+        <div id="cheat-counter" style="margin-top:20px; font-size:0.8rem; color:#94a3b8;"></div>
+    </div>
+</div>
 
 <div class="sidebar">
     <div class="sidebar-header">
-        <div style="font-size: 0.7rem; opacity: 0.7; letter-spacing: 1px;">PONTUAÇÃO</div>
+        <div style="font-size: 0.7rem; opacity: 0.7;">PONTUAÇÃO</div>
         <div class="score-board" id="score">0</div>
         <div style="font-size: 0.7rem; opacity: 0.5;">META: 200</div>
     </div>
@@ -58,20 +65,20 @@
 
 <div class="main-content">
     <div class="task-card">
-        <div style="font-size: 0.8rem; color: var(--primary); font-weight: 700; margin-bottom: 5px;">M14 - LINGUAGEM DE MANIPULAÇÃO DE DADOS</div>
-        <h2 id="task-title" style="margin:0; font-size: 1.4rem;">Teste 1ª GPSI</h2>
-        <p id="task-desc" style="color: #94a3b8; margin-top: 10px;">Selecione uma questão na barra lateral para carregar o exercício.</p>
+        <div style="font-size: 0.8rem; color: var(--primary); font-weight: 700;">M14 - MANIPULAÇÃO DE DADOS</div>
+        <h2 id="task-title" style="margin:0;">Teste 2 GPSI</h2>
+        <p id="task-desc" style="color: #94a3b8; margin-top: 10px;">Selecione uma questão lateral.</p>
     </div>
 
     <div class="editor-container">
         <div class="editor-header">
-            <span>Consola SQL</span>
+            <span>Editor SQL</span>
             <div class="controls">
                 <button class="btn-run" id="run-btn" onclick="runQuery()" disabled>RUN</button>
                 <button class="btn-submit" id="submit-btn" onclick="openModal()" disabled>SUBMETER</button>
             </div>
         </div>
-        <textarea id="sql-query" spellcheck="false" placeholder="-- Escreve o teu código e clica em RUN para testar..."></textarea>
+        <textarea id="sql-query" spellcheck="false" placeholder="-- Escreve e testa aqui..."></textarea>
     </div>
 
     <div id="feedback-msg" style="font-weight: 600; padding: 5px 0;"></div>
@@ -81,11 +88,9 @@
 <div id="confirmModal" class="modal">
     <div class="modal-content">
         <h3>Confirmar Submissão?</h3>
-        <p id="modal-warning">Esta será a tua resposta final para esta questão.</p>
-        <div style="display:flex; justify-content: center; gap: 10px; margin-top: 20px;">
-            <button style="background:var(--success); color:white;" onclick="processAnswer()">Confirmar</button>
-            <button style="background:#6b7280; color:white;" onclick="closeModal()">Cancelar</button>
-        </div>
+        <p id="modal-warning">Esta é a tua resposta final.</p>
+        <button style="background:var(--success); color:white; padding:10px 20px; margin:5px;" onclick="processAnswer()">Confirmar</button>
+        <button style="background:#6b7280; color:white; padding:10px 20px; margin:5px;" onclick="closeModal()">Cancelar</button>
     </div>
 </div>
 
@@ -94,6 +99,28 @@
     let score = 0;
     let currentIdx = -1;
     let questionResults = {};
+    let infractions = 0;
+    const SECRET_PASS = "RGBG";
+
+    window.addEventListener('blur', () => {
+        infractions++;
+        document.getElementById('lock-screen').style.display = 'flex';
+        document.getElementById('cheat-counter').innerText = "Infrações detetadas: " + infractions;
+        const input = document.getElementById('unlock-pass');
+        input.value = "";
+        setTimeout(() => input.focus(), 100);
+    });
+
+    function checkUnlock() {
+        const val = document.getElementById('unlock-pass').value;
+        if (val === SECRET_PASS) {
+            document.getElementById('lock-screen').style.display = 'none';
+        } else {
+            alert("Password Incorreta!");
+            document.getElementById('unlock-pass').value = "";
+            document.getElementById('unlock-pass').focus();
+        }
+    }
 
     const questoes = [
         { d: "Selecione todas as colunas da tabela 'funcionarios'.", a: "SELECT * FROM funcionarios" },
@@ -164,12 +191,12 @@
         const feedback = document.getElementById('feedback-msg');
         try {
             const res = db.exec(userSql);
-            feedback.innerText = "Execução bem-sucedida!";
+            feedback.innerText = "Execução terminada.";
             feedback.style.color = "var(--success)";
             if (res.length > 0) renderTable(res);
-            else document.getElementById('resultado').innerHTML = "<p style='padding:10px; color: #94a3b8;'>Comando executado (sem dados de retorno).</p>";
+            else document.getElementById('resultado').innerHTML = "<p style='padding:10px'>Comando executado.</p>";
         } catch (e) {
-            feedback.innerText = "Erro de SQL: " + e.message;
+            feedback.innerText = "Erro SQL: " + e.message;
             feedback.style.color = "var(--error)";
         }
     }
@@ -177,9 +204,9 @@
     function openModal() { 
         const userSql = document.getElementById('sql-query').value.trim();
         if (userSql === "") {
-            document.getElementById('modal-warning').innerHTML = "<b style='color:var(--error)'>AVISO: Campo vazio. Submissão resultará em 0 pontos.</b>";
+            document.getElementById('modal-warning').innerHTML = "<b style='color:red'>AVISO: Estás a submeter em branco (0 pontos).</b>";
         } else {
-            document.getElementById('modal-warning').innerText = "Confirmas a submissão final da Questão " + (currentIdx + 1) + "?";
+            document.getElementById('modal-warning').innerText = "Confirmas a submissão final?";
         }
         document.getElementById('confirmModal').style.display = 'flex'; 
     }
@@ -189,8 +216,6 @@
     function processAnswer() {
         closeModal();
         const userSql = document.getElementById('sql-query').value.trim();
-        const feedback = document.getElementById('feedback-msg');
-        
         try {
             const tempDb = new SQL.Database();
             setupDB(tempDb);
@@ -202,19 +227,12 @@
                 score += 13.34;
                 if(Object.keys(questionResults).length === 14) score = 200;
                 questionResults[currentIdx] = true;
-                feedback.innerText = "CERTO! Resposta válida.";
-                feedback.style.color = "var(--success)";
             } else {
                 questionResults[currentIdx] = false;
-                feedback.innerText = "ERRADO. Pontuação atribuída: 0.";
-                feedback.style.color = "var(--error)";
             }
         } catch (e) {
             questionResults[currentIdx] = false;
-            feedback.innerText = "ERRO TÉCNICO: 0 pontos.";
-            feedback.style.color = "var(--error)";
         }
-        
         document.getElementById('score').innerText = Math.round(score);
         loadTask(currentIdx);
         if(Object.keys(questionResults).length === 15) document.getElementById('finish-btn').style.display = 'block';
@@ -229,15 +247,17 @@
     }
 
     function finalizarExercicio() {
-        const nome = prompt("Introduza o seu Nome Completo para registo:");
+        const nome = prompt("Introduza o seu Nome Completo:");
         if(!nome) return;
         const FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdlkzy8ThUISVOpvA-USwjDyX0WcfzFxjbaHlgFVobgsn6IuA/formResponse";
         const data = new FormData();
-        data.append("entry.1736859903", nome);
+        const nomeFinal = nome + " (Infrações: " + infractions + ")";
+        data.append("entry.1736859903", nomeFinal);
         data.append("entry.1768292756", Math.round(score));
+
         fetch(FORM_URL, { method: 'POST', mode: 'no-cors', body: data })
         .then(() => {
-            alert("Teste Finalizado! A tua nota de " + Math.round(score) + " foi enviada com sucesso.");
+            alert("Sucesso! Nota de " + Math.round(score) + " enviada.");
             location.reload();
         });
     }
